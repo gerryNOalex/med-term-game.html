@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Terminology Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-touch-callout: none; /* iOS Safari */
+            -webkit-user-select: none; /* Safari */
+            -khtml-user-select: none; /* Konqueror HTML */
+            -moz-user-select: none; /* Old versions of Firefox */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */
+        }
+        .draggable {
+            cursor: grab;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .draggable:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+        .drop-zone {
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .drop-zone.drag-over {
+            background-color: #e0f2fe; /* light blue */
+            border-color: #38bdf8; /* sky blue */
+        }
+        .feedback-correct {
+            animation: correct-pulse 0.5s;
+        }
+        .feedback-incorrect {
+            animation: incorrect-shake 0.5s;
+        }
+        @keyframes correct-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        @keyframes incorrect-shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        /* Tooltip styling for hover definitions */
+        .draggable[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 5px;
+            background: #334155;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            z-index: 10;
+        }
+         .draggable[title] {
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="game-container" class="min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-5xl mx-auto">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl md:text-4xl font-bold text-sky-700">Medical Terminology Builder</h1>
+                <p class="text-slate-600 mt-2">Drag the word parts to match the definition. Hover over a part to see its meaning!</p>
+            </header>
+
+            <main class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-slate-200">
+                <!-- Definition and Score -->
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-sky-50 p-4 rounded-lg border border-sky-200">
+                    <div>
+                        <p class="font-semibold text-slate-700">Definition:</p>
+                        <p id="definition" class="text-lg text-sky-800 font-medium"></p>
+                    </div>
+                     <div id="progress-container" class="text-center mt-4 md:mt-0 md:mx-4">
+                        <p class="font-semibold text-slate-700">Progress</p>
+                        <span id="progress" class="text-2xl font-bold text-sky-800">1 / 40</span>
+                    </div>
+                    <div id="score-container" class="text-right mt-4 md:mt-0">
+                        <p class="font-semibold text-slate-700">Score</p>
+                        <span id="score" class="text-2xl font-bold text-sky-800">0</span>
+                    </div>
+                </div>
+
+                <!-- Word Builder Area -->
+                <div id="word-builder" class="mb-8 p-4 bg-slate-100 rounded-lg">
+                    <h2 class="text-lg font-semibold text-center mb-4 text-slate-700">Build Your Word Here</h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div id="prefix-drop" class="drop-zone border-2 border-dashed border-slate-400 rounded-lg p-4 h-20 flex items-center justify-center text-slate-500 font-medium" data-part="prefix">Prefix</div>
+                        <div id="root-drop" class="drop-zone border-2 border-dashed border-slate-400 rounded-lg p-4 h-20 flex items-center justify-center text-slate-500 font-medium" data-part="root">Root 1</div>
+                        <div id="root2-drop" class="drop-zone border-2 border-dashed border-slate-400 rounded-lg p-4 h-20 flex items-center justify-center text-slate-500 font-medium" data-part="root2">Root 2</div>
+                        <div id="suffix-drop" class="drop-zone border-2 border-dashed border-slate-400 rounded-lg p-4 h-20 flex items-center justify-center text-slate-500 font-medium" data-part="suffix">Suffix</div>
+                    </div>
+                </div>
+
+                <!-- Word Parts Selection -->
+                <div id="word-parts-container" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <h3 class="font-bold text-center mb-3 text-lg text-sky-700">Prefixes</h3>
+                        <div id="prefix-pool" class="bg-sky-50 p-4 rounded-lg min-h-[100px] grid grid-cols-2 gap-2"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-center mb-3 text-lg text-rose-700">Roots</h3>
+                        <div id="root-pool" class="bg-rose-50 p-4 rounded-lg min-h-[100px] grid grid-cols-2 gap-2"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-center mb-3 text-lg text-emerald-700">Suffixes</h3>
+                        <div id="suffix-pool" class="bg-emerald-50 p-4 rounded-lg min-h-[100px] grid grid-cols-2 gap-2"></div>
+                    </div>
+                </div>
+
+                <!-- Controls and Feedback -->
+                <div class="mt-8 text-center">
+                    <div id="feedback" class="h-8 mb-4 text-xl font-bold"></div>
+                    <button id="check-button" class="bg-sky-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-sky-700 transition-all duration-200 transform hover:scale-105">Check Answer</button>
+                    <button id="next-button" class="bg-emerald-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-emerald-700 transition-all duration-200 transform hover:scale-105 hidden">Next Word</button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DATA ---
+            const partDefinitions = {
+                'a-': 'without, away from', 'aden/o': 'gland', 'an-': 'without', 'ante-': 'before, in front of', 'anti-': 'against', 'auto-': 'self', 'brady-': 'slow', 'cyesis': 'pregnancy', 'dys-': 'painful, difficult', 'endo-': 'within, inner', 'epi-': 'upon, over', 'eu-': 'normal, good', 'hemi-': 'half', 'hyper-': 'over, above', 'hypo-': 'under, below', 'inter-': 'among, between', 'intra-': 'within, inside', 'laryng': 'voice box', 'mono-': 'one', 'nephr/o': 'kidney', 'ot/o': 'ear', 'pan-': 'all', 'path/o': 'disease', 'peritone': 'peritoneum', 'poly-': 'many', 'post-': 'after', 'peri-': 'around', 'pseudo-': 'false', 'pulmon/o': 'lung', 'retro-': 'backward, behind', 'sub-': 'below, under', 'tachy-': 'fast', 'trans-': 'through, across', 'ultra-': 'beyond, excess',
+                'arthr/o': 'joint', 'cardi': 'heart', 'cardi/o': 'heart', 'cutane': 'skin', 'derm': 'skin', 'dermat/o': 'skin', 'electr/o': 'electricity', 'enter': 'small intestine', 'gastr': 'stomach', 'gastr/o': 'stomach', 'hepat': 'liver', 'hepat/o': 'liver', 'neur': 'nerve', 'oste/o': 'bone', 'pharyng': 'pharynx (throat)', 'plegia': 'paralysis', 'pnea': 'breathing', 'rhin/o': 'nose', 'scope': 'instrument to view', 'sound': 'sound', 'splen/o': 'spleen', 'urethr': 'urethra', 'uria': 'urine', 'ven/o': 'vein', 'vertebr': 'vertebra',
+                '-ac': 'pertaining to', '-al': 'pertaining to', '-algia': 'pain', '-ary': 'pertaining to', '-centesis': 'puncture to withdraw fluid', '-ectomy': 'surgical removal', '-gram': 'record', '-ia': 'state, condition', '-ic': 'pertaining to', '-itis': 'inflammation', '-logy': 'study of', '-megaly': 'enlargement', '-ous': 'pertaining to', '-pathy': 'disease', '-rrhea': 'discharge, flow', '-scopy': 'process of visually examining', 'phasia': 'speech'
+            };
+
+            const wordData = [
+                // Original Words
+                { term: 'carditis', definition: 'Inflammation of the heart', parts: { prefix: null, root: 'cardi', root2: null, suffix: '-itis' } },
+                { term: 'dermatology', definition: 'Study of the skin', parts: { prefix: null, root: 'dermat/o', root2: null, suffix: '-logy' } },
+                { term: 'gastrectomy', definition: 'Surgical removal of the stomach', parts: { prefix: null, root: 'gastr', root2: null, suffix: '-ectomy' } },
+                { term: 'hypodermic', definition: 'Pertaining to under the skin', parts: { prefix: 'hypo-', root: 'derm', root2: null, suffix: '-ic' } },
+                { term: 'bradycardia', definition: 'Slow heartbeat', parts: { prefix: 'brady-', root: 'cardi', root2: null, suffix: '-ia' } },
+                { term: 'tachycardia', definition: 'Fast heartbeat', parts: { prefix: 'tachy-', root: 'cardi', root2: null, suffix: '-ia' } },
+                { term: 'hepatitis', definition: 'Inflammation of the liver', parts: { prefix: null, root: 'hepat', root2: null, suffix: '-itis' } },
+                { term: 'neuralgia', definition: 'Nerve pain', parts: { prefix: null, root: 'neur', root2: null, suffix: '-algia' } },
+                { term: 'dyspnea', definition: 'Difficulty breathing', parts: { prefix: 'dys-', root: 'pnea', root2: null, suffix: null } },
+                { term: 'rhinorrhea', definition: 'Discharge from the nose', parts: { prefix: null, root: 'rhin/o', root2: null, suffix: '-rrhea' } },
+                { term: 'arthrocentesis', definition: 'Puncture to withdraw fluid from a joint', parts: { prefix: null, root: 'arthr/o', root2: null, suffix: '-centesis' } },
+                { term: 'endoscope', definition: 'Instrument to view within', parts: { prefix: 'endo-', root: 'scope', root2: null, suffix: null } },
+                // Added Words (Set 1)
+                { term: 'aphasia', definition: 'Without speech', parts: { prefix: 'a-', root: 'phasia', root2: null, suffix: null } },
+                { term: 'autograft', definition: 'A graft from one\'s own body', parts: { prefix: 'auto-', root: 'graft', root2: null, suffix: null } },
+                { term: 'eupnea', definition: 'Normal breathing', parts: { prefix: 'eu-', root: 'pnea', root2: null, suffix: null } },
+                { term: 'intervertebral', definition: 'Between the vertebrae', parts: { prefix: 'inter-', root: 'vertebr', root2: null, suffix: '-al' } },
+                { term: 'intravenous', definition: 'Pertaining to within a vein', parts: { prefix: 'intra-', root: 'ven/o', root2: null, suffix: '-ous' } },
+                { term: 'pericardial', definition: 'Pertaining to around the heart', parts: { prefix: 'peri-', root: 'cardi', root2: null, suffix: '-al' } },
+                { term: 'postpartum', definition: 'After birth', parts: { prefix: 'post-', root: 'partum', root2: null, suffix: null } },
+                { term: 'subcutaneous', definition: 'Pertaining to under the skin', parts: { prefix: 'sub-', root: 'cutane', root2: null, suffix: '-ous' } },
+                { term: 'transurethral', definition: 'Pertaining to through the urethra', parts: { prefix: 'trans-', root: 'urethr', root2: null, suffix: '-al' } },
+                { term: 'ultrasound', definition: 'High-frequency sound waves', parts: { prefix: 'ultra-', root: 'sound', root2: null, suffix: null } },
+                { term: 'hemiplegia', definition: 'Paralysis of one half of the body', parts: { prefix: 'hemi-', root: 'plegia', root2: null, suffix: null } },
+                { term: 'monoplegia', definition: 'Paralysis of one extremity', parts: { prefix: 'mono-', root: 'plegia', root2: null, suffix: null } },
+                { term: 'polyuria', definition: 'Large amounts of urine', parts: { prefix: 'poly-', root: 'uria', root2: null, suffix: null } },
+                { term: 'hypertrophy', definition: 'Overdevelopment', parts: { prefix: 'hyper-', root: 'trophy', root2: null, suffix: null } },
+                // Double-Root Words
+                { term: 'gastroenteritis', definition: 'Inflammation of the stomach and small intestine', parts: { prefix: null, root: 'gastr/o', root2: 'enter', suffix: '-itis' } },
+                { term: 'electrocardiogram', definition: 'Record of the heart\'s electrical activity', parts: { prefix: null, root: 'electr/o', root2: 'cardi/o', suffix: '-gram' } },
+                { term: 'osteoarthritis', definition: 'Inflammation of the bone and joint', parts: { prefix: null, root: 'oste/o', root2: 'arthr/o', suffix: '-itis' } },
+                { term: 'rhinopharyngitis', definition: 'Inflammation of the nose and pharynx (throat)', parts: { prefix: null, root: 'rhin/o', root2: 'pharyng', suffix: '-itis' } },
+                { term: 'hepatosplenomegaly', definition: 'Enlargement of the liver and spleen', parts: { prefix: null, root: 'hepat/o', root2: 'splen/o', suffix: '-megaly' } },
+                // Added Words (Set 2) - New 9 words
+                { term: 'laryngitis', definition: 'Inflammation of the voice box', parts: { prefix: null, root: 'laryng', root2: null, suffix: '-itis' } },
+                { term: 'nephromegaly', definition: 'Enlarged kidney', parts: { prefix: null, root: 'nephr/o', root2: null, suffix: '-megaly' } },
+                { term: 'otoscopy', definition: 'Process of visually examining the ear', parts: { prefix: null, root: 'ot/o', root2: null, suffix: '-scopy' } },
+                { term: 'pathology', definition: 'Study of disease', parts: { prefix: null, root: 'path/o', root2: null, suffix: '-logy' } },
+                { term: 'pulmonary', definition: 'Pertaining to the lungs', parts: { prefix: null, root: 'pulmon/o', root2: null, suffix: '-ary' } },
+                { term: 'pancarditis', definition: 'Inflammation of all of the heart', parts: { prefix: 'pan-', root: 'cardi', root2: null, suffix: '-itis' } },
+                { term: 'pseudocyesis', definition: 'False pregnancy', parts: { prefix: 'pseudo-', root: 'cyesis', root2: null, suffix: null } },
+                { term: 'retroperitoneal', definition: 'Pertaining to behind the peritoneum', parts: { prefix: 'retro-', root: 'peritone', root2: null, suffix: '-al' } },
+                { term: 'adenopathy', definition: 'Disease of a gland', parts: { prefix: null, root: 'aden/o', root2: null, suffix: '-pathy' } }
+            ];
+
+            const allParts = {
+                prefixes: [...new Set(wordData.map(w => w.parts.prefix).filter(p => p))],
+                roots: [...new Set(wordData.flatMap(w => [w.parts.root, w.parts.root2]).filter(r => r))],
+                suffixes: [...new Set(wordData.map(w => w.parts.suffix).filter(s => s))]
+            };
+
+            // --- STATE ---
+            let currentWordIndex = 0;
+            let score = 0;
+            let userSelection = { prefix: null, root: null, root2: null, suffix: null };
+
+            // --- DOM ELEMENTS ---
+            const definitionEl = document.getElementById('definition');
+            const scoreEl = document.getElementById('score');
+            const progressEl = document.getElementById('progress');
+            const feedbackEl = document.getElementById('feedback');
+            const checkButton = document.getElementById('check-button');
+            const nextButton = document.getElementById('next-button');
+            const dropZones = document.querySelectorAll('.drop-zone');
+            const prefixPool = document.getElementById('prefix-pool');
+            const rootPool = document.getElementById('root-pool');
+            const suffixPool = document.getElementById('suffix-pool');
+            const rootDrop = document.getElementById('root-drop');
+            const root2Drop = document.getElementById('root2-drop');
+
+            // --- FUNCTIONS ---
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            function createDraggable(text, type, container) {
+                const partEl = document.createElement('div');
+                partEl.textContent = text;
+                partEl.draggable = true;
+                partEl.dataset.partType = type;
+                partEl.dataset.value = text;
+                partEl.title = partDefinitions[text] || 'Definition not found';
+                
+                let colorClasses = '';
+                switch(type) {
+                    case 'prefix': colorClasses = 'bg-sky-200 text-sky-800 border-sky-300'; break;
+                    case 'root': case 'root2': colorClasses = 'bg-rose-200 text-rose-800 border-rose-300'; break;
+                    case 'suffix': colorClasses = 'bg-emerald-200 text-emerald-800 border-emerald-300'; break;
+                }
+                
+                partEl.className = `draggable p-3 rounded-lg text-center font-semibold border ${colorClasses}`;
+                partEl.addEventListener('dragstart', handleDragStart);
+                container.appendChild(partEl);
+            }
+
+            function populatePools() {
+                prefixPool.innerHTML = '';
+                rootPool.innerHTML = '';
+                suffixPool.innerHTML = '';
+
+                const currentWord = wordData[currentWordIndex];
+                
+                const getOptions = (correctPart, allOptions, count) => {
+                    const options = new Set(correctPart ? [correctPart] : []);
+                    while (options.size < count && options.size < allOptions.length) {
+                        options.add(allOptions[Math.floor(Math.random() * allOptions.length)]);
+                    }
+                    return shuffle(Array.from(options));
+                };
+
+                const prefixesToShow = getOptions(currentWord.parts.prefix, allParts.prefixes, 4);
+                const suffixesToShow = getOptions(currentWord.parts.suffix, allParts.suffixes, 4);
+                
+                const correctRoots = [currentWord.parts.root, currentWord.parts.root2].filter(Boolean);
+                const rootOptions = new Set(correctRoots);
+                 while (rootOptions.size < 6 && rootOptions.size < allParts.roots.length) {
+                    rootOptions.add(allParts.roots[Math.floor(Math.random() * allParts.roots.length)]);
+                }
+                const rootsToShow = shuffle(Array.from(rootOptions));
+
+                prefixesToShow.forEach(p => createDraggable(p, 'prefix', prefixPool));
+                rootsToShow.forEach(r => createDraggable(r, 'root', rootPool));
+                suffixesToShow.forEach(s => createDraggable(s, 'suffix', suffixPool));
+            }
+
+            function setupNewWord() {
+                const word = wordData[currentWordIndex];
+                definitionEl.textContent = word.definition;
+                progressEl.textContent = `${currentWordIndex + 1} / ${wordData.length}`;
+                userSelection = { prefix: null, root: null, root2: null, suffix: null };
+                
+                resetDropZones();
+                populatePools();
+                
+                if (word.parts.root2) {
+                    rootDrop.textContent = 'Root 1';
+                    root2Drop.textContent = 'Root 2';
+                    root2Drop.classList.add('drop-zone');
+                    root2Drop.classList.remove('bg-slate-200', 'border-slate-300', 'text-slate-400', 'cursor-not-allowed');
+                } else {
+                    rootDrop.textContent = 'Root';
+                    root2Drop.textContent = 'N/A';
+                    root2Drop.classList.remove('drop-zone');
+                    root2Drop.classList.add('bg-slate-200', 'border-slate-300', 'text-slate-400', 'cursor-not-allowed');
+                }
+
+                feedbackEl.textContent = '';
+                feedbackEl.className = 'h-8 mb-4 text-xl font-bold';
+                checkButton.classList.remove('hidden');
+                nextButton.classList.add('hidden');
+            }
+
+            function resetDropZones() {
+                dropZones.forEach(zone => {
+                    const partType = zone.dataset.part;
+                    let label = partType.charAt(0).toUpperCase() + partType.slice(1);
+                    if (partType === 'root') label = 'Root 1';
+                    if (partType === 'root2') label = 'Root 2';
+                    zone.textContent = label;
+                    zone.className = `drop-zone border-2 border-dashed border-slate-400 rounded-lg p-4 h-20 flex items-center justify-center text-slate-500 font-medium`;
+                });
+            }
+
+            function checkAnswer() {
+                const correctParts = wordData[currentWordIndex].parts;
+                const normalize = (val) => val || null;
+
+                if (normalize(userSelection.prefix) === normalize(correctParts.prefix) &&
+                    normalize(userSelection.root) === normalize(correctParts.root) &&
+                    normalize(userSelection.root2) === normalize(correctParts.root2) &&
+                    normalize(userSelection.suffix) === normalize(correctParts.suffix)) {
+                    
+                    score++;
+                    scoreEl.textContent = score;
+                    feedbackEl.textContent = 'Correct!';
+                    feedbackEl.classList.add('text-emerald-600', 'feedback-correct');
+                } else {
+                    feedbackEl.textContent = 'Not quite, try again!';
+                    feedbackEl.classList.add('text-rose-600', 'feedback-incorrect');
+                }
+
+                checkButton.classList.add('hidden');
+                nextButton.classList.remove('hidden');
+            }
+
+            function handleNextWord() {
+                currentWordIndex++;
+                if (currentWordIndex >= wordData.length) {
+                    feedbackEl.textContent = `Game Over! Final Score: ${score} / ${wordData.length}`;
+                    feedbackEl.classList.remove('text-rose-600', 'text-emerald-600');
+                    feedbackEl.classList.add('text-sky-700');
+                    nextButton.textContent = 'Restart Game';
+                    currentWordIndex = 0;
+                    score = 0;
+                } else {
+                    nextButton.textContent = 'Next Word';
+                    scoreEl.textContent = score;
+                    setupNewWord();
+                }
+            }
+            
+            nextButton.addEventListener('click', () => {
+                if (nextButton.textContent === 'Restart Game') {
+                    scoreEl.textContent = '0';
+                    shuffle(wordData);
+                    setupNewWord();
+                    nextButton.textContent = 'Next Word';
+                } else {
+                    handleNextWord();
+                }
+            });
+
+
+            // --- DRAG & DROP HANDLERS ---
+            function handleDragStart(e) {
+                e.dataTransfer.setData('text/plain', e.target.dataset.value);
+                const partType = e.target.dataset.partType;
+                const genericType = (partType === 'root' || partType === 'root2') ? 'root' : partType;
+                e.dataTransfer.setData('part-type', genericType);
+                setTimeout(() => { e.target.style.opacity = '0.5'; }, 0);
+            }
+
+            function handleDragEnd(e) {
+                e.target.style.opacity = '1';
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                if (e.currentTarget.classList.contains('drop-zone')) {
+                    e.currentTarget.classList.add('drag-over');
+                }
+            }
+
+            function handleDragLeave(e) {
+                e.currentTarget.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                if (!e.currentTarget.classList.contains('drop-zone')) return;
+                e.currentTarget.classList.remove('drag-over');
+                const value = e.dataTransfer.getData('text/plain');
+                const type = e.dataTransfer.getData('part-type');
+                const dropZoneType = e.currentTarget.dataset.part;
+                
+                const isRootDrop = (dropZoneType === 'root' || dropZoneType === 'root2');
+
+                if ((isRootDrop && type === 'root') || type === dropZoneType) {
+                    userSelection[dropZoneType] = value;
+                    e.currentTarget.textContent = value;
+                    e.currentTarget.className = `drop-zone p-4 h-20 flex items-center justify-center font-bold rounded-lg text-white`;
+                    
+                    let colorClass = '';
+                    if (type === 'prefix') colorClass = 'bg-sky-600';
+                    else if (type === 'root') colorClass = 'bg-rose-600';
+                    else if (type === 'suffix') colorClass = 'bg-emerald-600';
+                    e.currentTarget.classList.add(colorClass);
+                }
+            }
+
+            // --- EVENT LISTENERS ---
+            checkButton.addEventListener('click', checkAnswer);
+            
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('dragleave', handleDragLeave);
+                zone.addEventListener('drop', handleDrop);
+            });
+
+            document.body.addEventListener('dragend', handleDragEnd);
+
+            // --- INITIALIZATION ---
+            shuffle(wordData);
+            setupNewWord();
+        });
+    </script>
+</body>
+</html>
